@@ -88,6 +88,7 @@ export default async function handler(req, res) {
       case 'admin/save-product': return await adminSaveProduct(payload, res);
       case 'admin/delete-product': return await adminDeleteProduct(payload, res);
       case 'admin/upload-image': return await adminUploadImage(payload, res);
+      case 'admin/get-upload-url': return await adminGetUploadUrl(payload, res);
 
       default:
         return res.status(404).json({ error: `Unknown action: ${action}` });
@@ -480,5 +481,39 @@ async function adminUploadImage(payload, res) {
   } catch (error) {
     console.error("Upload error exception:", error);
     return res.status(500).json({ error: "Exception during upload" });
+  }
+}
+
+async function adminGetUploadUrl(payload, res) {
+  const { filename, contentType } = payload;
+  if (!filename) return res.status(400).json({ error: 'No filename provided' });
+
+  try {
+    const bucketName = 'agri_content';
+    const uniqueFilename = `${Date.now()}-${filename.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+    const filePath = `uploads/${uniqueFilename}`;
+
+    const { data: signedUrlData, error: signedUrlError } = await supabase.storage
+      .from(bucketName)
+      .createSignedUploadUrl(filePath);
+
+    if (signedUrlError) {
+      console.error("Signed URL error:", signedUrlError);
+      return res.status(500).json({ error: `Could not generate signed URL: ${signedUrlError.message}` });
+    }
+
+    const { data: publicUrlData } = supabase.storage
+      .from(bucketName)
+      .getPublicUrl(filePath);
+
+    return res.status(200).json({
+      success: true,
+      signedUrl: signedUrlData.signedUrl,
+      path: filePath,
+      publicUrl: publicUrlData.publicUrl
+    });
+  } catch (error) {
+    console.error("Upload URL error:", error);
+    return res.status(500).json({ error: "Exception generating upload URL" });
   }
 }
