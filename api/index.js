@@ -456,7 +456,7 @@ async function adminUploadImage(payload, res) {
     const contentType = matches[1];
     const buffer = Buffer.from(matches[2], 'base64');
 
-    const bucketName = 'agri_content';
+    const bucketName = 'magazine-files';
     // Generate a unique path to avoid collisions
     const uniqueFilename = `${Date.now()}-${filename.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
     const filePath = `uploads/${uniqueFilename}`;
@@ -489,7 +489,7 @@ async function adminGetUploadUrl(payload, res) {
   if (!filename) return res.status(400).json({ error: 'No filename provided' });
 
   try {
-    const bucketName = 'agri_content';
+    const bucketName = 'magazine-files';
     const uniqueFilename = `${Date.now()}-${filename.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
     const filePath = `uploads/${uniqueFilename}`;
 
