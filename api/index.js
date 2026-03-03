@@ -440,14 +440,45 @@ async function adminDeleteProduct(payload, res) {
 }
 
 async function adminUploadImage(payload, res) {
-  // If payload contains base64 image data:
   const { fileBase64, filename } = payload;
   if (!fileBase64) return res.status(400).json({ error: 'No file data (fileBase64)' });
   
-  // As a workaround since local filesystem uploads aren't great for Vercel Hobby,
-  // returning success and a fake URL for now unless a storage backend is provided.
-  // Ideally this uploads to Supabase Storage. The frontend is requesting no supabase storage, 
-  // so we can put it in base64 format in database or host locally (ephemeral).
-  // Let's assume the user will configure storage later or we just ignore it.
-  return res.status(200).json({ success: true, url: `/uploads/${filename || 'uploaded.jpg'}` });
+  if (!filename) return res.status(400).json({ error: 'No filename provided' });
+
+  try {
+    // Parse the base64 string (e.g. "data:image/jpeg;base64,...")
+    const matches = fileBase64.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+    if (!matches || matches.length !== 3) {
+      return res.status(400).json({ error: 'Invalid base64 string' });
+    }
+
+    const contentType = matches[1];
+    const buffer = Buffer.from(matches[2], 'base64');
+
+    const bucketName = 'agri_content';
+    // Generate a unique path to avoid collisions
+    const uniqueFilename = `${Date.now()}-${filename.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+    const filePath = `uploads/${uniqueFilename}`;
+
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from(bucketName)
+      .upload(filePath, buffer, {
+        contentType,
+        upsert: false
+      });
+
+    if (uploadError) {
+      console.error("Storage upload error:", uploadError);
+      return res.status(500).json({ error: `Storage upload failed: ${uploadError.message}` });
+    }
+
+    const { data: publicUrlData } = supabase.storage
+      .from(bucketName)
+      .getPublicUrl(filePath);
+
+    return res.status(200).json({ success: true, url: publicUrlData.publicUrl });
+  } catch (error) {
+    console.error("Upload error exception:", error);
+    return res.status(500).json({ error: "Exception during upload" });
+  }
 }
